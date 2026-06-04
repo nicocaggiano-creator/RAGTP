@@ -72,7 +72,7 @@ Contexto:
 """
 
 
-def generate_with_openrouter(question: str, results, api_key: str, model: str) -> str:
+def call_openrouter(question: str, results, api_key: str, model: str) -> str:
     context = rag.compact_context(results, max_chars=8500)
     response = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
@@ -99,6 +99,15 @@ def generate_with_openrouter(question: str, results, api_key: str, model: str) -
     response.raise_for_status()
     data = response.json()
     return data["choices"][0]["message"]["content"].strip()
+
+
+def generate_with_openrouter(question: str, results, api_key: str, model: str) -> str:
+    try:
+        return call_openrouter(question, results, api_key, model)
+    except requests.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code == 404 and model != "openrouter/free":
+            return call_openrouter(question, results, api_key, "openrouter/free")
+        raise
 
 
 st.set_page_config(
@@ -140,7 +149,7 @@ with st.sidebar:
 
     st.header("Respuesta generada")
     openrouter_key = get_secret("OPENROUTER_API_KEY")
-    default_model = get_secret("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct:free")
+    default_model = get_secret("OPENROUTER_MODEL", "openrouter/free")
     use_openrouter = st.toggle("Usar OpenRouter", value=bool(openrouter_key))
     openrouter_model = st.text_input("Modelo", value=default_model)
     if use_openrouter and not openrouter_key:
